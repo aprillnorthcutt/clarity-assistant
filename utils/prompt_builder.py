@@ -22,6 +22,17 @@ def build_prompt(module_data: Dict, audit_note: str) -> List[Dict[str, str]]:
     checks_block = _bulletize(checks)
     refs_block = _bulletize(gaap_refs)
 
+    # Apply default text if no checks or GAAP references exist
+    if not checks_block:
+        checks_block = (
+            "- Identify vague or ambiguous language\n"
+            "- Provide precise, supportable alternatives\n"
+            "- Flag missing or risky disclosures"
+        )
+
+    if not refs_block:
+        refs_block = "- Use relevant GAAP guidance when applicable."
+
     system_prompt = f"""
 You are an expert nonprofit audit reviewer and technical writer.
 Your goal is to improve clarity, specificity, and GAAP-aligned disclosure quality.
@@ -31,13 +42,13 @@ Objective: {objective}
 Audit Context: {context}
 
 Primary review checks:
-{checks_block if checks_block else "- Identify vague or ambiguous language\n- Provide precise, supportable alternatives\n- Flag missing or risky disclosures"}
+{checks_block}
 
 Additional guidance:
 {guidance if guidance else "Use plain, specific language; avoid boilerplate; include concrete amounts, dates, policies, restrictions, and constraints when known."}
 
 If GAAP references are relevant, consider:
-{refs_block if refs_block else "- Use relevant GAAP guidance when applicable."}
+{refs_block}
 
 Output format:
 - Start with a concise summary of issues.
@@ -45,7 +56,7 @@ Output format:
 - Include clarifying questions to fill gaps.
 - Note risks or compliance considerations.
 - Keep recommendations specific and actionable.
-    """.strip()
+""".strip()
 
     user_prompt = f"""Audit note to review:
 ---
