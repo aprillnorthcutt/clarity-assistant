@@ -332,3 +332,15 @@ if plan:
             }
             st.toast("Numbers saved. Now click **Clarify Plan** to re-run with updated context.")
             st.rerun()
+
+# 🔻 Footer
+ st.markdown("---")
+        st.markdown("<small>Built for clarity, compliance, and impact.</small>", unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div style='font-size: 14px; color: #888; text-align: center; margin-top: 20px;'>
+                © 2025 <a href="https://github.com/aprillnorthcutt" target="_blank" style="color: #888; text-decoration: none;">April Northcutt</a>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
