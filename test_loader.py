@@ -1,12 +1,11 @@
-# utils/module_loader.py
 import os
 import yaml
 
-# ✅ Use absolute path so it works in Azure
+# Update this to match where your modules are relative to this script
 MODULE_DIR = os.path.join(os.getcwd(), "modules")
 
 def _module_path(module_id: int) -> str:
-    fname = f"module{int(module_id)}.yaml"
+    fname = f"Module{int(module_id)}.yaml"
     return os.path.join(MODULE_DIR, fname)
 
 def load_module(module_id: int) -> dict:
@@ -28,3 +27,6 @@ def load_module(module_id: int) -> dict:
         "guidance": data.get("guidance", ""),
         "gaap_refs": data.get("gaap_refs", []),
     }
+
+# 👇 Call it
+print(load_module(1))  # Or 2, 3, etc., depending on what you have in /modules
