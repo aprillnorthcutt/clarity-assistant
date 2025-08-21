@@ -3,7 +3,7 @@ import os
 import yaml
 
 # ✅ Use absolute path so it works in Azure
-MODULE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "modules"))
+MODULE_DIR = os.path.join(os.getcwd(), "modules")
 
 def _module_path(module_id: int) -> str:
     fname = f"Module{int(module_id)}.yaml"
