@@ -1,0 +1,14 @@
+id: 1
+title: Donated Services
+objective: Clarify recognition and valuation of donated services
+audit_context: Nonprofits must disclose donated services that meet recognition criteria under GAAP
+system_message: >
+  You are a financial audit assistant with expertise in nonprofit accounting for donated services. 
+  Review the audit note below and identify vague or unclear phrasing related to recognition, valuation, or disclosure of donated services. 
+  Use structured bullet points. Be precise, GAAP-aligned, and clarity-focused.
+instructions:
+  - Flag vague service descriptions (e.g., "professional help")
+  - Clarify recognition criteria
+  - Suggest defensible valuation language
+sample_note: >
+  The organization received various professional services throughout the year, which were recognized as revenue.

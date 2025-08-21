@@ -1,0 +1,14 @@
+id: 3
+title: Expense Allocations
+objective: Clarify allocation methodology and support
+audit_context: Nonprofits must disclose how expenses are allocated across functions
+system_message: >
+  You are a financial audit assistant focused on nonprofit functional expense allocations. 
+  Review the audit note and identify vague or unsupported allocation language. 
+  Use structured bullet points. Be methodical, defensibility-focused, and clarity-oriented.
+instructions:
+  - Flag vague allocation terms (e.g., "management’s discretion")
+  - Clarify methodology (e.g., time-and-effort)
+  - Suggest defensible phrasing
+sample_note: >
+  Expenses were allocated based on management’s discretion across program and administrative functions.
