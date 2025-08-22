@@ -2,7 +2,9 @@
 
 import os
 import json
+import datetime
 import streamlit as st
+from utils import diagnostics
 from openai import AzureOpenAI
 from utils.module_loader import load_module  # loads .md files by dotted path (e.g., "prompts.finance.clarifier.system")
 
@@ -48,7 +50,7 @@ def render_global_nav(active: str):
                 "pages/20_Financial_Clarity_Assistant.py",
                 label="💰 Financial Clarity Assistant",
             )
-            
+
 # ---- Session state for finance page ----
 if "finance_plan" not in st.session_state:
     st.session_state.finance_plan = None
@@ -115,17 +117,30 @@ def render_action_card(a: dict):
 st.title("Financial Clarity Assistant")
 st.caption("Turn vague money notes into a clear, actionable plan.")
 
-# 👉 Add the global nav right after title/caption (so it's always visible)
+# Add the global nav right after title/caption (so it's always visible)
 render_global_nav(active="finance")
 
-# 🔐 Azure OpenAI client
+# Azure OpenAI client (defensive api_version)
+endpoint = os.environ["AZURE_OPENAI_ENDPOINT"]
+api_version_env = (os.environ.get("AZURE_OPENAI_API_VERSION") or "").strip()
+
+def _safe_api_version(v: str) -> str:
+    # Accept formats like YYYY-MM-DD or YYYY-MM-DD-preview (e.g., 2025-01-01-preview)
+    parts = v.split("-")
+    if len(parts) >= 3 and parts[0].isdigit() and parts[1].isdigit() and parts[2].isdigit():
+        return v
+    # Fallback to your intended version
+    return "2025-01-01-preview"
+
+api_version = _safe_api_version(api_version_env)
+
 client = AzureOpenAI(
     api_key=os.environ["AZURE_OPENAI_KEY"],
-    api_version=os.environ["AZURE_OPENAI_API_VERSION"],
-    azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"]
+    api_version=api_version,
+    azure_endpoint=endpoint,
 )
 
-# 🧠 Optional context in sidebar (helps produce more specific plans)
+# Optional context in sidebar (helps produce more specific plans)
 with st.sidebar:
     # subtle divider between the global nav and this section
     st.markdown(
@@ -140,8 +155,15 @@ with st.sidebar:
     horizon = st.text_input("Time horizon", placeholder="e.g., Next 3 months", key="finance_horizon")
     constraints = st.text_area("Constraints", placeholder="e.g., Travel in Oct; fixed rent", key="finance_constraints")
     st.markdown("---")
-    st.markdown("<small>Built for clarity, simplicity, and action.</small>", unsafe_allow_html=True)
-
+    st.markdown("<small><center>Built for clarity, simplicity, and action.</center></small>", unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div style='font-size: 14px; color: #888; text-align: center; margin-top: 0px;'>
+            © 2025 <a href="https://github.com/aprillnorthcutt" target="_blank" style="color: #888; text-decoration: none;">April Northcutt</a>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # ── Controls (place BEFORE the textarea so we can safely set session state) ──
 col1, col2, col3, col4 = st.columns([1,1,1,1])
@@ -166,7 +188,7 @@ with col4:
                 del st.session_state[k]
         st.rerun()
 
-# 📝 Main input (binds to session state AFTER any Try Demo/Reset changes)
+# Main input (binds to session state AFTER any Try Demo/Reset changes)
 user_text = st.text_area(
     "Paste a note (messy is fine):",
     height=175,
@@ -174,13 +196,19 @@ user_text = st.text_area(
     key="finance_user_text"
 )
 
-# 🚀 Invoke model (updates session state only)
+# Invoke model (updates session state only)
 if run and user_text.strip():
     try:
-        system = load_module("prompts.finance.clarifier.system")
-        developer = load_module("prompts.finance.clarifier.developer")
-        user_tmpl = load_module("prompts.finance.clarifier.user.tmpl")
+        # --- Load prompt modules (defensively coerce to str) ---
+        system_raw = load_module("prompts.finance.clarifier.system")
+        developer_raw = load_module("prompts.finance.clarifier.developer")
+        user_tmpl_raw = load_module("prompts.finance.clarifier.user.tmpl")
 
+        system = system_raw if isinstance(system_raw, str) else str(system_raw)
+        developer = developer_raw if isinstance(developer_raw, str) else str(developer_raw)
+        user_tmpl = user_tmpl_raw if isinstance(user_tmpl_raw, str) else str(user_tmpl_raw)
+
+        # Build the user message
         user_msg = user_tmpl.format(
             user_text=user_text.strip(),
             income=income or "TBD",
@@ -190,16 +218,27 @@ if run and user_text.strip():
             constraints=constraints or "None"
         )
 
+        dep = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "").strip()
+        ver = os.environ.get("AZURE_OPENAI_API_VERSION", "").strip()
+        
+        # Diagnostics toggle on or off using '#'
+#        try:
+#            diagnostics.assert_valid(system, developer, user_msg)
+#            diagnostics.show_prompts(system, developer, user_msg, dep, ver)
+#        except Exception:
+            # never let diagnostics crash the app
+#            pass
+
         with st.spinner("Thinking…"):
             resp = client.chat.completions.create(
-                model=os.environ["AZURE_OPENAI_DEPLOYMENT"],
-                temperature=0.2,
-                max_tokens=900,
+                model=dep,                  # Azure *deployment* name
+                temperature=float(0.2),     # force numeric
+                max_tokens=int(900),        # force numeric
                 messages=[
                     {"role": "system", "content": system},
                     {"role": "system", "content": developer},
-                    {"role": "user", "content": user_msg}
-                ]
+                    {"role": "user", "content": user_msg},
+                ],
             )
 
         raw = resp.choices[0].message.content
@@ -209,11 +248,12 @@ if run and user_text.strip():
         except Exception:
             plan = {"summary": "Parse issue", "raw": raw}
 
-        # Save to session state so it persists across reruns
         st.session_state.finance_plan = plan
 
     except Exception as e:
-        st.error(f"❌ Error calling Azure OpenAI: {e}")
+        # Do not touch `resp` here—it may not exist.
+        st.error(f"Error calling Azure OpenAI: {e}")
+        st.code(traceback.format_exc())
 
 # --- Render stored plan (persists across reruns) ---
 plan = st.session_state.get("finance_plan")
@@ -302,10 +342,12 @@ if plan:
             )
         with colC:
             savings_refine = st.text_input(
-                "Savings target / baseline (e.g., $300/mo or $5k EF by Dec)",
+                "Savings target / baseline",
                 value=str(st.session_state.get("finance_goals") or ""),
-                key="finance_goals_refine"
-            )
+                key="finance_goals_refine",
+                placeholder="e.g., $300/mo or $5k EF by Dec",
+                help="Enter either a monthly amount (e.g., $300/mo) or a total + date (e.g., $5k EF by Dec).",
+)
 
         extra_notes = st.text_area(
             "Optional notes (new debts, constraints, timing)",
@@ -332,15 +374,3 @@ if plan:
             }
             st.toast("Numbers saved. Now click **Clarify Plan** to re-run with updated context.")
             st.rerun()
-
-# 🔻 Footer
-st.markdown("---")
-st.markdown("<small>Built for clarity, compliance, and impact.</small>", unsafe_allow_html=True)
-st.markdown(
-    """
-    <div style='font-size: 14px; color: #888; text-align: center; margin-top: 20px;'>
-        © 2025 <a href="https://github.com/aprillnorthcutt" target="_blank" style="color: #888; text-decoration: none;'>April Northcutt</a>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
